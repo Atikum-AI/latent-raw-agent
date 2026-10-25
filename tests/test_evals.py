@@ -13,7 +13,7 @@ def line(case_id, step, decision, cites=("item:x",)):
 
 def right_run(case):
     e = case["expected"]
-    out = [line(case["case_id"], "classify", {"items": e["items"], "clipped_items": e["clipped_items"]}),
+    out = [line(case["case_id"], "classify", {"items": e["items"] or [], "clipped_items": e["clipped_items"] or []}),
            line(case["case_id"], "plan", {"passes": e["passes"], "rulings": e["rulings"]})]
     if "max_lum_gap_stops" in e:
         out.append(line(case["case_id"], "verify", {"max_lum_gap_stops": 0.1}))
@@ -24,6 +24,7 @@ def test_three_cases_load():
     assert len(CASES) >= 3
     for c in CASES.values():
         assert {"items", "clipped_items", "passes", "rulings"} <= set(c["expected"])
+        assert not any("TODO" in clip for clip in c["clips"])
 
 
 def test_right_plan_scores_100():
@@ -40,7 +41,7 @@ def test_sam_before_expand_breaks_the_hard_rule():
 
 
 def test_missing_ruling_and_citation_lose_points():
-    c = CASES["case02_chrome_ruling"]
+    c = CASES["case02_lantern_flame"]
     run = right_run(c)
     run[1]["decision"]["rulings"] = []
     run[1]["cites"] = []
@@ -51,7 +52,7 @@ def test_missing_ruling_and_citation_lose_points():
 
 
 def test_clip_gap_over_limit_fails():
-    c = CASES["case03_two_clip_match"]
+    c = CASES["case03_dawn_jungle_match"]
     run = right_run(c)
     run[-1]["decision"]["max_lum_gap_stops"] = 0.8
     assert score_case(c, run)["checks"]["clip_match"]["score"] == 0.0
@@ -67,4 +68,10 @@ def test_cli_on_sample_trace(tmp_path, capsys):
     report = main(["evals/sample_trace.jsonl", "--out", str(out)])
     assert json.loads(out.read_text())["mean_score"] == report["mean_score"]
     scores = {r["case_id"]: r["score"] for r in report["cases"]}
-    assert scores["case01_car_sky"] == 100.0 and scores["case02_chrome_ruling"] < 100
+    assert scores["case01_car_sky"] == 100.0 and scores["case02_lantern_flame"] < 100
+
+
+def test_null_expectation_skips_the_check():
+    c = CASES["case03_dawn_jungle_match"]
+    r = score_case(c, right_run(c))
+    assert r["checks"]["items"]["score"] is None and r["score"] == 100.0

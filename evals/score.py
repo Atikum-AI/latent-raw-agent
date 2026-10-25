@@ -2,6 +2,7 @@
 
 A case (evals/cases/*.json) says what the right plan is: which items are in frame,
 which are clipped, which passes to run in which order, which colourist rulings apply.
+An expected value of null means that check is skipped for the case.
 
 A trace is the agent's JSONL log for one run: one line per decision. The scorer reads
 lines shaped like this (FIELDS below maps the names, so it can follow Saad's format):
@@ -86,6 +87,8 @@ def _passes(lines):
 
 
 def check_items(case, lines):
+    if case["expected"]["items"] is None:
+        return None, "not set for this case"
     want = set(case["expected"]["items"])
     got = set(_collect(lines, "items"))
     found = want & got
@@ -93,6 +96,8 @@ def check_items(case, lines):
 
 
 def check_clipped(case, lines):
+    if case["expected"]["clipped_items"] is None:
+        return None, "not set for this case"
     want = set(case["expected"]["clipped_items"])
     got = set(_collect(lines, "clipped"))
     if want == got:
