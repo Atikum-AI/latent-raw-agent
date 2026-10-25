@@ -63,6 +63,9 @@ def vision(question, image_path, poll_every=2.0, timeout=180, step=None):
                             "url": f"data:{mime};base64,{b64}"}]}
     h = _headers(VISION_APP)
     job = requests.post(f"{BASE}/jobs", headers=h, json=req, timeout=60).json()
+    if "id" not in job:
+        # A bad token or a refused job comes back without an id; show Nightshift's reason.
+        raise RuntimeError(f"Nightshift refused the job: {json.dumps(job)[:300]}")
     job_id, deadline = job["id"], time.time() + timeout
     while job.get("status") != "completed":
         if job.get("status") in ("failed", "errored", "error", "cancelled") or time.time() > deadline:
