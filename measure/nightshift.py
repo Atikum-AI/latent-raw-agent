@@ -56,7 +56,8 @@ def vision(question, image_path, poll_every=2.0, timeout=180, step=None):
         b64 = base64.b64encode(f.read()).decode()
     mime = "image/png" if image_path.lower().endswith(".png") else "image/jpeg"
     # attempt_budget gives the answer room; without it replies get cut off.
-    req = {"kind": "best_of_n", "n": 1, "attempt_budget": {"level": "high"},
+    # With only the header, the job ran as app "default", so name the app in the body too.
+    req = {"kind": "best_of_n", "n": 1, "attempt_budget": {"level": "high"}, "app": VISION_APP,
            "messages": [{"role": "user", "content": question}],
            "attachments": [{"kind": "image", "name": os.path.basename(image_path),
                             "url": f"data:{mime};base64,{b64}"}]}
@@ -64,7 +65,7 @@ def vision(question, image_path, poll_every=2.0, timeout=180, step=None):
     job = requests.post(f"{BASE}/jobs", headers=h, json=req, timeout=60).json()
     job_id, deadline = job["id"], time.time() + timeout
     while job.get("status") != "completed":
-        if job.get("status") in ("failed", "cancelled") or time.time() > deadline:
+        if job.get("status") in ("failed", "errored", "error", "cancelled") or time.time() > deadline:
             _log("vision", {"question": question, "image": image_path}, None, job, step)
             raise RuntimeError(f"job {job_id} ended as {job.get('status')}")
         time.sleep(poll_every)
