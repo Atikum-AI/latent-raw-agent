@@ -97,7 +97,7 @@ def test_vision_live_then_sample_mode(tmp_path, monkeypatch):
     assert replay[0]["evidence_id"] == "vision:shot01:f1:contents"
 
 
-def test_nightshift_reads_artifacts(monkeypatch, tmp_path):
+def test_nightshift_waits_for_the_winner(monkeypatch, tmp_path):
     from measure import nightshift
 
     class R:
@@ -105,15 +105,20 @@ def test_nightshift_reads_artifacts(monkeypatch, tmp_path):
         def json(self): return self.body
 
     monkeypatch.setattr(nightshift, "LOG", str(tmp_path / "ns.jsonl"))
-    posted = {}
+    posted, artifact_calls = {}, []
 
     def post(url, headers, json, timeout):
-        posted.update(json); posted["app"] = headers["meterless-app"]
+        posted.update(json); posted["header_app"] = headers["meterless-app"]
         return R({"id": "job_9", "status": "queued"})
 
     def get(url, headers, timeout):
         if url.endswith("/artifacts"):
-            return R({"data": [{"summary": "brightest area is the sky, clipped", "model": "nemotron-super-vl"}]})
+            artifact_calls.append(1)
+            if len(artifact_calls) == 1:  # job says completed, winner not filled in yet
+                return R({"data": [{"summary": "not yet decided", "model": "nemotron-super-vl"}]})
+            return R({"data": [{"summary": "loser", "model": "other"},
+                               {"summary": "brightest area is the sky, clipped",
+                                "model": "nemotron-super-vl", "winner": True}]})
         return R({"id": "job_9", "status": "completed", "lanes_resolved": ["race:super-vl"]})
 
     monkeypatch.setattr(nightshift.requests, "post", post)
@@ -121,9 +126,27 @@ def test_nightshift_reads_artifacts(monkeypatch, tmp_path):
     img = tmp_path / "f.jpg"; Image.new("RGB", (4, 4)).save(img)
     answer, job = nightshift.vision("Where is the brightest area?", str(img), poll_every=0)
     assert answer == "brightest area is the sky, clipped"
+    assert len(artifact_calls) == 2
     assert job["answer_model"] == "nemotron-super-vl"
-    assert posted["attempt_budget"] == {"level": "high"} and posted["app"] == "latent-raw-vision"
+    assert posted["attempt_budget"] == {"level": "high"}
+    assert posted["app"] == posted["header_app"] == "latent-raw-vision"
     assert json.loads((tmp_path / "ns.jsonl").read_text().splitlines()[0])["kind"] == "vision"
+
+
+def test_nightshift_errored_job_stops_at_once(monkeypatch, tmp_path):
+    from measure import nightshift
+
+    class R:
+        def __init__(self, body): self.body, self.ok = body, True
+        def json(self): return self.body
+
+    monkeypatch.setattr(nightshift, "LOG", str(tmp_path / "ns.jsonl"))
+    monkeypatch.setattr(nightshift.requests, "post",
+                        lambda url, headers, json, timeout: R({"id": "job_e", "status": "errored",
+                                                               "error_code": "fleet_cannot_vision"}))
+    img = tmp_path / "f.jpg"; Image.new("RGB", (4, 4)).save(img)
+    with pytest.raises(RuntimeError, match="errored"):
+        nightshift.vision("q", str(img), poll_every=0, timeout=999)
 
 
 @pytest.mark.skipif(not os.environ.get("EVIDENCE_DATABASE_URL"), reason="no database")

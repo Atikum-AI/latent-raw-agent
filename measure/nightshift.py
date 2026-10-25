@@ -8,7 +8,7 @@
 
 Env: METERLESS_BASE_URL (default http://127.0.0.1:8088/v1), METERLESS_RUNTIME_TOKEN
 """
-import base64, io, json, os, re, time, uuid, zipfile
+import base64, json, os, time
 from datetime import datetime, timezone
 import requests
 
@@ -70,61 +70,30 @@ def vision(question, image_path, poll_every=2.0, timeout=180, step=None):
             raise RuntimeError(f"job {job_id} ended as {job.get('status')}")
         time.sleep(poll_every)
         job = requests.get(f"{BASE}/jobs/{job_id}", headers=h, timeout=30).json()
-    answer, model = _answer_from_artifacts(job_id, h)
+    answer, model = _winning_answer(job_id, h, poll_every, max(deadline, time.time() + 60))
     _log("vision", {"question": question, "image": image_path, "job_id": job_id},
          answer, _receipt(job) or {"lanes_resolved": job.get("lanes_resolved"), "model": model}, step)
     job["answer_model"] = model
     return answer, job
 
 
-def _answer_from_artifacts(job_id, h):
-    """GET /jobs/<id>/artifacts: each attempt has "summary" (the answer) and "model".
-    Falls back to the zip export if the artifacts list is empty."""
-    r = requests.get(f"{BASE}/jobs/{job_id}/artifacts", headers=h, timeout=60)
-    if r.ok:
-        body = r.json()
-        items = body.get("data", body) if isinstance(body, dict) else body
-        items = items if isinstance(items, list) else [items]
-        attempts = [a for a in items if isinstance(a, dict) and a.get("summary")]
-        if attempts:
-            return attempts[-1]["summary"], attempts[-1].get("model")
-    export = requests.get(f"{BASE}/jobs/{job_id}/export", headers=h, timeout=60)
-    return _answer_from_export(export.content), None
+def _winning_answer(job_id, h, poll_every, deadline):
+    """Poll GET /jobs/<id>/artifacts until the winning attempt has its summary.
 
-
-def _answer_from_export(zip_bytes):
-    """The export is a zip; the answer text lives in data.js. The exact layout is not
-    documented, so look for a JSON object inside data.js and fall back to the raw file."""
-    with zipfile.ZipFile(io.BytesIO(zip_bytes)) as z:
-        name = next(n for n in z.namelist() if n.endswith("data.js"))
-        raw = z.read(name).decode("utf-8", "replace")
-    m = re.search(r"[\[{].*[\]}]", raw, re.S)
-    if m:
-        try:
-            data = json.loads(m.group(0))
-            texts = _find_texts(data)
-            if texts:
-                return texts[-1]
-        except json.JSONDecodeError:
-            pass
-    return raw
-
-
-def _find_texts(obj, out=None):
-    """Collect assistant text from whatever nesting data.js uses."""
-    out = [] if out is None else out
-    if isinstance(obj, dict):
-        if obj.get("role") == "assistant" and isinstance(obj.get("content"), str):
-            out.append(obj["content"])
-        for k in ("text", "answer", "output"):
-            if isinstance(obj.get(k), str):
-                out.append(obj[k])
-        for v in obj.values():
-            _find_texts(v, out)
-    elif isinstance(obj, list):
-        for v in obj:
-            _find_texts(v, out)
-    return out
+    A job reports "completed" a few seconds before the winner's summary is filled in,
+    so reading straight away returns the "not yet decided" placeholder."""
+    while True:
+        r = requests.get(f"{BASE}/jobs/{job_id}/artifacts", headers=h, timeout=60)
+        if r.ok:
+            body = r.json()
+            items = body.get("data", body) if isinstance(body, dict) else body
+            items = items if isinstance(items, list) else [items]
+            for a in items:
+                if isinstance(a, dict) and a.get("winner") and a.get("summary"):
+                    return a["summary"], a.get("model")
+        if time.time() > deadline:
+            raise RuntimeError(f"job {job_id} completed but no winning answer arrived in time")
+        time.sleep(poll_every)
 
 
 if __name__ == "__main__":
