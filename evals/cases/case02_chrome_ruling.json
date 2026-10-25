@@ -1,0 +1,15 @@
+{
+  "case_id": "case02_chrome_ruling",
+  "title": "Single clip: clipped chrome highlights, with a colourist ruling in memory",
+  "clips": ["TODO_kyo_clip_02"],
+  "why_this_plan": "H-MEM holds the ruling that clipped specular highlights on chrome are fine on this show, so the agent must not try to fix them and must cite the ruling.",
+  "memory": [
+    {"ruling_id": "chrome_specular_ok", "text": "On this show, clipped specular highlights on chrome are fine."}
+  ],
+  "expected": {
+    "items": ["car", "road"],
+    "clipped_items": ["car"],
+    "passes": ["expand_hdr", "to_aces_linear", "sam_items", "balance", "write_exr"],
+    "rulings": ["chrome_specular_ok"]
+  }
+}

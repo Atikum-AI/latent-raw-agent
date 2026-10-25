@@ -1,0 +1,7 @@
+{"case_id": "case01_car_sky", "step": "classify", "decision": {"items": ["car", "sky", "buildings"], "clipped_items": ["sky"]}, "cites": ["item:shot01:f1:sky", "item:shot01:f1:car"]}
+{"case_id": "case01_car_sky", "step": "plan", "decision": {"passes": ["expand_hdr", "to_aces_linear", "sam_items", "balance", "write_exr"], "rulings": []}, "cites": ["range:shot01:f1"]}
+{"case_id": "case02_chrome_ruling", "step": "classify", "decision": {"items": ["car", "road"], "clipped_items": ["car"]}, "cites": ["item:shot02:f1:car"]}
+{"case_id": "case02_chrome_ruling", "step": "plan", "decision": {"passes": ["sam_items", "expand_hdr", "to_aces_linear", "balance", "write_exr"], "rulings": []}, "cites": []}
+{"case_id": "case03_two_clip_match", "step": "classify", "decision": {"items": ["sky", "buildings", "road"], "clipped_items": ["sky"]}, "cites": ["item:shot03a:f1:sky"]}
+{"case_id": "case03_two_clip_match", "step": "plan", "decision": {"passes": ["expand_hdr", "to_aces_linear", "sam_items", "balance", "match_clips", "write_exr"], "rulings": []}, "cites": ["item:shot03a:f1:sky"]}
+{"case_id": "case03_two_clip_match", "step": "verify", "decision": {"max_lum_gap_stops": 0.21}, "cites": ["balance:shot03a:shot03b:sky:after"]}
