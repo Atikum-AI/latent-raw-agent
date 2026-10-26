@@ -11,6 +11,9 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
+# The sample clips, masks, EXRs and measurements live on Hugging Face (public); fetch them at build time
+# so a clean clone runs: https://huggingface.co/datasets/caiotbr/latent-raw-agent-samples
+RUN python scripts/fetch_samples.py
 
 EXPOSE 8000
 CMD ["python", "run.py", "--all"]
