@@ -31,3 +31,19 @@ To serve it: `python run.py --serve --port 8000`, then
 The full-size clips are in the Hugging Face dataset caiotbr/latent-raw-agent-samples. Sample mode does not need them;
 to measure from them yourself, run `python scripts/fetch_samples.py`, then `python run.py --all`
 with `SAMPLE_MODE=0`.
+
+## Memory: Meterless H-MEM
+
+The colourist's rulings ("on this show, practical flames may clip; never pull them down") live in a
+[Meterless H-MEM](https://github.com/meterless/H-MEM) engine, implemented in `agent/hmem.py` from the spec's `AGENTS.md`:
+
+- **Canonical records** with provenance: source, confidence, domain, entities, `supersedes`, `relatedTo`, `derivedFrom`.
+- **Tiered storage:** short-term (this run), working and long-term (`memory/hmem/*.json`), forgetting curve on non-long-term.
+- **Hybrid retrieval** after classify: the measured items (`lantern_flame`) are the query entities, so a ruling about
+  "flames" is found for a lantern shot; the plan cites it as `hmem:<ruling_id>`.
+- **Trust ledger:** every create, read, feedback and conflict is appended to `memory/hmem/ledger.jsonl`.
+- **Feedback:** after verify, an applied ruling that passed gains confidence; one that failed loses it.
+- **Conflicts:** opposing rulings on the same items are detected and resolved by recency and confidence (audited).
+
+`python scripts/hmem_demo.py` shows a colourist reversing a ruling, H-MEM detecting the conflict, and the agent
+following the newer ruling. Dreaming and sleep cycles (opt-in in the spec) are not implemented.

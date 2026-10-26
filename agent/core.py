@@ -106,12 +106,14 @@ class Run:
             f"SELECT evidence_id, shot_id, src_clipped_pct, hdr_range_stops, synthesized_pct "
             f"FROM frame_range WHERE shot_id IN ({_in(len(self.clips))})", self.clips) \
             if self._has("frame_range") else ([], None)
+        if self.rulings:  # captured from the case; now ask H-MEM which apply to the measured items
+            self.rulings, self.hmem_trace = memory.retrieve_for_items(self.items, self.clips)
         valid = {r["ruling_id"]: r for r in self.rulings if any(memory.covers(r, i) for i in self.items)}
 
         prompt = (
             "Step: plan. Items: " + json.dumps(self.items) + ". Clipped: " + json.dumps(self.clipped) +
             ". Frame range rows: " + json.dumps(rows) + ". Colourist rulings in memory: " +
-            json.dumps(self.rulings) + ". Passes available: " + json.dumps(PIPELINE) +
+            json.dumps([{"ruling_id": r["ruling_id"], "text": r["text"]} for r in self.rulings]) + ". Passes available: " + json.dumps(PIPELINE) +
             ". Hard rules: expand_hdr runs on the full frame before sam_items; SAM cut-outs are "
             "measured, never regenerated; balance runs after sam_items; write_exr is last. "
             'Reply as JSON: {"passes": [...in order], "rulings": [ruling_id...], '
@@ -274,4 +276,5 @@ def run_case(case, sample_mode=None, log_path="logs/run.jsonl"):
         sample_mode = os.environ.get("SAMPLE_MODE", "0") == "1"
     r = Run(case["case_id"], case["clips"], memory.load_rulings(case), sample_mode, log_path)
     last = r.go()
+    memory.feedback(r.rulings, getattr(r, "rulings_applied", []), (r.verdict or {}).get("passed"))
     return {"case_id": r.case_id, "run_id": r.run_id, "report": last["decision"], "trace": r.lines}
