@@ -1,0 +1,29 @@
+{
+  "case_id": "case03_dawn_jungle_match",
+  "title": "Timeline: the same two people in a cool dawn canoe shot and a warm jungle shot",
+  "clips": [
+    "clip03a_canoe_dawn",
+    "clip03b_jungle_warm"
+  ],
+  "why_this_plan": "Match skin tones and exposure across both clips. The clips differ in format (720p/24 against 1080p/30), so match on measured items, not on pixels.",
+  "notes": "Items from Kyo (person_young, person_old and sky are matched across the two clips). Clipped items are not set, so that check is skipped (null). The 1/3 stop limit is our own choice.",
+  "expected": {
+    "items": [
+      "person_young",
+      "person_old",
+      "water",
+      "sky",
+      "forest"
+    ],
+    "clipped_items": null,
+    "passes": [
+      "expand_hdr",
+      "to_aces_linear",
+      "sam_items",
+      "balance",
+      "write_exr"
+    ],
+    "rulings": [],
+    "max_lum_gap_stops": 0.33
+  }
+}

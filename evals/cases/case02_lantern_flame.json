@@ -1,0 +1,15 @@
+{
+  "case_id": "case02_lantern_flame",
+  "title": "Single clip: lantern on a table, with a colourist ruling in memory",
+  "clips": ["clip02_lantern_table"],
+  "why_this_plan": "H-MEM holds the ruling that practical flames may clip on this show. The agent must leave the flame hot, never pull it down, and cite the ruling.",
+  "memory": [
+    {"ruling_id": "practical_flames_hot", "text": "On this show, practical flames may clip. Never pull them down."}
+  ],
+  "expected": {
+    "items": ["lantern_flame", "girl", "table", "hands"],
+    "clipped_items": ["lantern_flame"],
+    "passes": ["expand_hdr", "to_aces_linear", "sam_items", "balance", "write_exr"],
+    "rulings": ["practical_flames_hot"]
+  }
+}

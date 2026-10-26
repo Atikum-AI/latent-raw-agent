@@ -1,0 +1,6 @@
+numpy
+Pillow
+OpenEXR>=3.3
+requests
+psycopg[binary]>=3.1
+pytest

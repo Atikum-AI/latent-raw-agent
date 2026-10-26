@@ -1,0 +1,10 @@
+# Everything run.py, POST /run and the tests need. Python 3.12 (the Dockerfile's base).
+numpy
+Pillow
+OpenEXR>=3.3
+requests
+psycopg[binary]>=3.1
+fastapi
+uvicorn
+httpx
+pytest
