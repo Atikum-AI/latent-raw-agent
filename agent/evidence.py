@@ -24,6 +24,8 @@ class Evidence:
             self.conn.row_factory = sqlite3.Row
 
     def load(self, tables):
+        if self.kind == "postgres" and tables.get("shots"):
+            self._clear([s["shot_id"] for s in tables["shots"]])
         for t in ORDER:
             rows = tables.get(t) or []
             if not rows:
@@ -32,6 +34,16 @@ class Evidence:
                 store.upsert(self.conn, t, rows)
             else:
                 self._sqlite_insert(t, rows)
+
+    def _clear(self, shot_ids):
+        """Drop a clip's old measurements, so rows from an earlier key frame or an
+        earlier run can't be read as evidence for this one."""
+        with self.conn.cursor() as cur:
+            for table, where in (("balance_checks", "shot_a = ANY(%s) OR shot_b = ANY(%s)"),
+                                 ("item_metrics", "shot_id = ANY(%s)"),
+                                 ("frame_range", "shot_id = ANY(%s)")):
+                cur.execute(f"DELETE FROM {table} WHERE {where}", [shot_ids] * where.count("%s"))
+        self.conn.commit()
 
     def _sqlite_insert(self, table, rows):
         cols = sorted({c for r in rows for c in r})

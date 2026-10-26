@@ -160,3 +160,13 @@ def test_postgres_upsert_and_view(tmp_path):
         cur.execute("SELECT subject, (facts->>'clipped_pct')::float FROM shot_evidence "
                     "WHERE shot_id = 'shot01' AND kind = 'item' ORDER BY subject")
         assert cur.fetchall() == [("car", 0.0), ("sky", 100.0)]  # one row each, not two
+
+
+def test_rolled_off_highlights_count_as_clipped(tmp_path):
+    """AI video rolls highlights off below 254; 252 must still count as clipped."""
+    d = make_shot(tmp_path, sky_value=252)
+    src = metrics.load_8bit(d / "frame.png")
+    items = metrics.load_item_masks(d / "masks", src.shape[:2])
+    rows = {r["item"]: r for r in metrics.item_rows("shot01", 1, src, items, np.zeros(src.shape[:2], bool))}
+    assert rows["sky"]["clipped_pct"] == 100.0
+    assert rows["car"]["clipped_pct"] == 0.0

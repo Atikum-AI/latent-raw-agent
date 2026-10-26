@@ -35,7 +35,7 @@ def upsert(conn, table, rows):
     cols = list(rows[0].keys())
     updates = ", ".join(f"{c} = EXCLUDED.{c}" for c in cols if c != key)
     sql = (f"INSERT INTO {table} ({', '.join(cols)}) VALUES ({', '.join(['%s'] * len(cols))}) "
-           f"ON CONFLICT ({key}) DO UPDATE SET {updates}")
+           f"ON CONFLICT ({key}) " + (f"DO UPDATE SET {updates}" if updates else "DO NOTHING"))
 
     def cell(c, v):
         if c in JSON_COLUMNS and v is not None and not isinstance(v, str):

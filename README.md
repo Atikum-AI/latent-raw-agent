@@ -28,6 +28,6 @@ decisions against the right plan for each case.
 To serve it: `python run.py --serve --port 8000`, then
 `curl -X POST localhost:8000/run -H 'Content-Type: application/json' -d '{"case": "case01_car_sky"}'`.
 
-The full-size EXRs are in the `sample-data-v1` release. Sample mode does not need them;
+The full-size clips are in the Hugging Face dataset caiotbr/latent-raw-agent-samples. Sample mode does not need them;
 to measure from them yourself, run `python scripts/fetch_samples.py`, then `python run.py --all`
 with `SAMPLE_MODE=0`.

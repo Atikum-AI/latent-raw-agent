@@ -1,98 +1,96 @@
-"""Download the sample-data-v1 GitHub Release into samples/.
+"""Download the sample clips from Hugging Face into samples/.
 
     python scripts/fetch_samples.py
-    python scripts/fetch_samples.py --tag sample-data-v1 --dest samples --force
+    python scripts/fetch_samples.py --dest samples --force
 
-Release assets can be either:
-  - one file per clip file, named <clip_id>__<file>, e.g. clip01_car_street_sun__expand_hdr.exr
-    -> samples/clip01_car_street_sun/expand_hdr.exr
-  - a .zip of clip folders (with or without a leading samples/) -> unpacked into samples/
-
-The repo is public, so no token is needed. GITHUB_TOKEN is used if set (higher rate limit).
+The dataset (caiotbr/latent-raw-agent-samples) holds one folder per clip in the
+agent's layout: <clip_id>/clip.json, source.png, masks/<item>.png, synth.png,
+expand_hdr.exr, balance.exr. A leading samples/ in the dataset paths is dropped, and
+folders without a clip.json (tools/) are skipped.
+It is public, so no token is needed; HF_TOKEN is used if set.
 """
 import argparse
-import io
 import os
-import sys
-import zipfile
 from pathlib import Path
 
 import requests
 
-REPO = os.environ.get("SAMPLES_REPO", "Atikum-AI/latent-raw-agent")
+DATASET = os.environ.get("SAMPLES_DATASET", "caiotbr/latent-raw-agent-samples")
+HF = "https://huggingface.co"
+SKIP = {".gitattributes", "README.md"}
 
 
 def _headers():
-    h = {"Accept": "application/vnd.github+json"}
-    if os.environ.get("GITHUB_TOKEN"):
-        h["Authorization"] = f"Bearer {os.environ['GITHUB_TOKEN']}"
-    return h
+    return {"Authorization": f"Bearer {os.environ['HF_TOKEN']}"} if os.environ.get("HF_TOKEN") else {}
 
 
 def _safe(dest, rel):
-    """Keep every write inside dest, whatever the asset or zip entry is called."""
+    """Keep every write inside dest, whatever the dataset path is."""
     out = (dest / rel).resolve()
     if dest.resolve() not in out.parents:
         raise ValueError(f"refusing to write outside {dest}: {rel}")
     return out
 
 
-def target(dest, name):
-    if "__" not in name:
+def list_files(dataset, revision):
+    url = f"{HF}/api/datasets/{dataset}/tree/{revision}?recursive=true"
+    files = []
+    while url:
+        r = requests.get(url, headers=_headers(), timeout=30)
+        if r.status_code == 404:
+            raise SystemExit(f"No dataset called {dataset} on Hugging Face (or it is private).")
+        r.raise_for_status()
+        files += [f["path"] for f in r.json() if f.get("type") == "file"]
+        url = r.links.get("next", {}).get("url")  # long listings come in pages
+    return files
+
+
+def _rel(path):
+    return path[len("samples/"):] if path.startswith("samples/") else path
+
+
+def clip_folders(paths):
+    """Only folders with a clip.json are clips; tools/ and the like are left out."""
+    return {Path(_rel(p)).parts[0] for p in paths if Path(_rel(p)).name == "clip.json" and len(Path(_rel(p)).parts) == 2}
+
+
+def local_path(dest, path, clips):
+    rel = _rel(path)
+    if Path(rel).parts[0] not in clips or Path(rel).name in SKIP or "/" not in rel:
         return None
-    clip, file = name.split("__", 1)
-    return _safe(dest, Path(clip) / file)
+    return _safe(dest, rel)
 
 
-def unpack(dest, data):
-    n = 0
-    with zipfile.ZipFile(io.BytesIO(data)) as z:
-        for info in z.infolist():
-            if info.is_dir():
-                continue
-            rel = info.filename[len("samples/"):] if info.filename.startswith("samples/") else info.filename
-            out = _safe(dest, rel)
-            out.parent.mkdir(parents=True, exist_ok=True)
-            out.write_bytes(z.read(info))
-            n += 1
-    return n
-
-
-def fetch(tag="sample-data-v1", dest="samples", force=False):
+def fetch(dest="samples", force=False, dataset=DATASET, revision="main"):
     dest = Path(dest)
-    r = requests.get(f"https://api.github.com/repos/{REPO}/releases/tags/{tag}", headers=_headers(), timeout=30)
-    if r.status_code == 404:
-        sys.exit(f"No release called {tag} in {REPO} yet.")
-    r.raise_for_status()
     got = 0
-    for asset in r.json().get("assets", []):
-        name, url = asset["name"], asset["browser_download_url"]
-        out = None if name.endswith(".zip") else target(dest, name)
-        if not name.endswith(".zip") and out is None:
-            print(f"skip {name}: expected <clip_id>__<file> or a .zip")
+    paths = list_files(dataset, revision)
+    clips = clip_folders(paths)
+    for path in paths:
+        out = local_path(dest, path, clips)
+        if out is None:
             continue
-        if out is not None and out.exists() and not force:
+        if out.exists() and not force:
             print(f"have {out}")
             continue
-        print(f"get  {name} ({asset.get('size', 0) // 1024} KB)")
-        data = requests.get(url, headers={"Accept": "application/octet-stream"}, timeout=300).content
-        if out is None:
-            got += unpack(dest, data)
-        else:
-            out.parent.mkdir(parents=True, exist_ok=True)
-            out.write_bytes(data)
-            got += 1
+        print(f"get  {path}")
+        r = requests.get(f"{HF}/datasets/{dataset}/resolve/{revision}/{path}", headers=_headers(), timeout=300)
+        r.raise_for_status()
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_bytes(r.content)
+        got += 1
     print(f"done: {got} files into {dest}/")
     return got
 
 
 def main(argv=None):
     p = argparse.ArgumentParser(prog="python scripts/fetch_samples.py")
-    p.add_argument("--tag", default="sample-data-v1")
     p.add_argument("--dest", default=os.environ.get("SAMPLES_DIR", "samples"))
+    p.add_argument("--dataset", default=DATASET)
+    p.add_argument("--revision", default="main")
     p.add_argument("--force", action="store_true", help="download files you already have")
     a = p.parse_args(argv)
-    fetch(a.tag, a.dest, a.force)
+    fetch(a.dest, a.force, a.dataset, a.revision)
 
 
 if __name__ == "__main__":

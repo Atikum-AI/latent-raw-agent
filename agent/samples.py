@@ -11,7 +11,7 @@ Layout (agreed with Kyo, who delivers one key frame per clip):
         balance.exr      key frame after the balance pass
         evidence.json    the measured rows, so sample mode needs no EXRs
 
-The small files are committed; the EXRs come from the sample-data-v1 GitHub Release
+The clips live in the Hugging Face dataset caiotbr/latent-raw-agent-samples
 (python scripts/fetch_samples.py).
 """
 import json

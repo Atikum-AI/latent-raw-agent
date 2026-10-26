@@ -28,7 +28,7 @@ CREATE TABLE IF NOT EXISTS frame_range (
     evidence_id       text PRIMARY KEY,             -- 'range:shot01:f120'
     shot_id           text REFERENCES shots,
     frame             int,
-    src_clipped_pct   numeric,   -- % of 8-bit pixels with a channel at 254-255
+    src_clipped_pct   numeric,   -- % of 8-bit pixels with a channel at 250+
     src_peak_lum      numeric,   -- linear Rec.709, 0..1
     hdr_peak_lum      numeric,   -- linear ACES
     hdr_mean_lum      numeric,
@@ -42,7 +42,7 @@ CREATE TABLE IF NOT EXISTS item_metrics (
     frame             int,
     item              text,      -- SAM 3.1 label: car, sky, buildings
     area_pct          numeric,
-    clipped_pct       numeric,   -- 8-bit source
+    clipped_pct       numeric,   -- 8-bit source, channel at 250+
     mean_lum          numeric,   -- 8-bit source, linear Rec.709
     peak_lum          numeric,
     mean_saturation   numeric,

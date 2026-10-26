@@ -1,4 +1,4 @@
-{"case_id": "case01_car_sky", "step": "classify", "decision": {"items": ["car", "sky", "buildings", "road"], "clipped_items": ["sky", "road"]}, "cites": ["item:clip01:f1:sky", "item:clip01:f1:road"]}
+{"case_id": "case01_car_sky", "step": "classify", "decision": {"items": ["car", "sky", "buildings", "road"], "clipped_items": ["sky"]}, "cites": ["item:clip01:f1:sky"]}
 {"case_id": "case01_car_sky", "step": "plan", "decision": {"passes": ["expand_hdr", "to_aces_linear", "sam_items", "balance", "write_exr"], "rulings": []}, "cites": ["range:clip01:f1"]}
 {"case_id": "case02_lantern_flame", "step": "classify", "decision": {"items": ["lantern_flame", "girl", "table", "hands"], "clipped_items": ["lantern_flame"]}, "cites": ["item:clip02:f1:lantern_flame"]}
 {"case_id": "case02_lantern_flame", "step": "plan", "decision": {"passes": ["sam_items", "expand_hdr", "to_aces_linear", "balance", "write_exr"], "rulings": []}, "cites": []}

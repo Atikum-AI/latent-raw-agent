@@ -1,12 +1,27 @@
 {
   "case_id": "case01_car_sky",
   "title": "Single clip: car on a street under a low sun",
-  "clips": ["clip01_car_street_sun"],
-  "why_this_plan": "Sky and road are clipped in 8-bit, so expand on the full frame first, then split with SAM to measure. No LoRA on cut-outs.",
+  "clips": [
+    "clip01_car_street_sun"
+  ],
+  "why_this_plan": "The sky is clipped in 8-bit, so expand on the full frame first, then split with SAM to measure. No LoRA on cut-outs.",
   "expected": {
-    "items": ["car", "sky", "buildings", "road"],
-    "clipped_items": ["sky", "road"],
-    "passes": ["expand_hdr", "to_aces_linear", "sam_items", "balance", "write_exr"],
+    "items": [
+      "car",
+      "sky",
+      "buildings",
+      "road"
+    ],
+    "clipped_items": [
+      "sky"
+    ],
+    "passes": [
+      "expand_hdr",
+      "to_aces_linear",
+      "sam_items",
+      "balance",
+      "write_exr"
+    ],
     "rulings": []
   }
 }

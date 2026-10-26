@@ -25,7 +25,7 @@ PIPELINE = ["expand_hdr", "to_aces_linear", "sam_items", "balance", "write_exr"]
 # to measure (never to regenerate), then balance, then write.
 MUST_PRECEDE = [("expand_hdr", "to_aces_linear"), ("expand_hdr", "sam_items"), ("expand_hdr", "balance"),
                 ("sam_items", "balance"), ("balance", "write_exr"), ("to_aces_linear", "write_exr")]
-CLIPPED_PCT = 1.0      # an item with >= 1% of its pixels at 254-255 is clipped
+CLIPPED_PCT = 5.0      # an item with >= 5% of its pixels at 250+ is clipped
 MAX_GAP_STOPS = 0.33   # two clips cut together when matched items sit within 1/3 stop
 PROTECT_KEEP = 0.95    # a protected item keeps at least 95% of its peak through balance
 
@@ -79,7 +79,7 @@ class Run:
 
         prompt = (
             "Step: classify. Evidence rows from item_metrics (one per SAM item; clipped_pct is the "
-            "share of the item's 8-bit pixels at 254-255):\n" + json.dumps(rows) +
+            "share of the item's 8-bit pixels with a channel at 250 or above):\n" + json.dumps(rows) +
             f"\nWhich items are in frame, and which are clipped (treat >= {CLIPPED_PCT}% as clipped "
             "unless you see a reason in the rows)? Reply as JSON: "
             '{"items": [...], "clipped_items": [...], "why": "one sentence citing evidence_id values"}'
@@ -88,13 +88,15 @@ class Run:
         items, clipped, why = measured, rule_clipped, "rules: every SAM item with a row; clipped by threshold"
         if ans:
             unbacked = [i for i in ans.get("items", []) + ans.get("clipped_items", []) if i not in clip_pct]
-            # The model may call an item clipped if its row shows any clipping; the
-            # threshold items stay clipped whatever it says.
-            extra = [i for i in ans.get("clipped_items", []) if i in clip_pct and clip_pct[i] > 0]
-            clipped = list(dict.fromkeys(rule_clipped + extra))
+            # The measured threshold decides what is clipped; where the model disagrees,
+            # the trace says so, with the numbers.
+            said = [i for i in ans.get("clipped_items", []) if i in clip_pct]
             why = ans.get("why", "")
             if unbacked:
                 why += f" [dropped {unbacked}: no measured row]"
+            if set(said) != set(rule_clipped):
+                why += (f" [model said clipped {said}; kept {rule_clipped} by the {CLIPPED_PCT}% rule: "
+                        + ", ".join(f"{i} {clip_pct[i]}%" for i in sorted(set(said) ^ set(rule_clipped))) + "]")
         cites = [r["evidence_id"] for r in rows if r["item"] in clipped] or [r["evidence_id"] for r in rows]
         self.items, self.clipped = items, clipped
         return self.log("classify", {"items": items, "clipped_items": clipped}, cites, [q], model, why)
@@ -142,7 +144,7 @@ class Run:
             for c in self.clips:
                 out = samples.pass_output(c, p)
                 status = "precomputed" if out else (
-                    "in release (measured rows saved)" if self.sample_mode else "missing")
+                    "on Hugging Face (measured rows saved)" if self.sample_mode else "missing")
                 ran.append({"pass": p, "clip": c, "output": str(out) if out else None, "status": status})
         rows, q = self.ev.sql(
             f"SELECT evidence_id FROM item_metrics WHERE shot_id IN ({_in(len(self.clips))}) ORDER BY evidence_id",
@@ -231,7 +233,7 @@ class Run:
         deliver = {}
         for c in self.clips:
             out = samples.pass_output(c, "write_exr") or samples.pass_output(c, "expand_hdr")
-            deliver[c] = str(out) if out else f"{c}: final EXR in the sample-data-v1 release"
+            deliver[c] = str(out) if out else f"{c}: final EXR in the Hugging Face sample dataset (python scripts/fetch_samples.py)"
         facts = {"items": self.items, "clipped": self.clipped, "passes": self.passes,
                  "rulings": self.rulings_applied, "verify": self.verdict}
         prompt = ("Step: report. Write two sentences for the colourist: what was done and whether it "

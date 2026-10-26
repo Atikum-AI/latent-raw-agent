@@ -40,7 +40,7 @@ of `score.py`; nothing else needs to change.
 
 | Case | Clips | What it tests |
 | --- | --- | --- |
-| case01_car_sky | clip01_car_street_sun | Sky and road clipped under a low sun |
+| case01_car_sky | clip01_car_street_sun | Sky clipped under a low sun |
 | case02_lantern_flame | clip02_lantern_table | Ruling `practical_flames_hot`: leave the flame hot and cite the ruling |
 | case03_dawn_jungle_match | clip03a_canoe_dawn, clip03b_jungle_warm | Match skin and exposure across a cool and a warm clip (720p/24 vs 1080p/30) |
 

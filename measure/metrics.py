@@ -18,7 +18,9 @@ REC709_Y = np.array([0.2126, 0.7152, 0.0722])
 ACES_AP0_Y = np.array([0.3439664498, 0.7281660966, -0.0721325464])  # ACES2065-1
 ACES_AP1_Y = np.array([0.2722287168, 0.6740817658, 0.0536895174])   # ACEScg
 
-CLIP_LEVEL_8BIT = 254  # a channel at 254 or 255 counts as clipped
+# A channel at 250 or above counts as clipped. AI video rolls highlights off below 254,
+# so a stricter level finds nothing clipped in real clips (Kyo, 26 Oct).
+CLIP_LEVEL_8BIT = 250
 EPS = 1e-6
 
 
@@ -91,7 +93,7 @@ def frame_range_row(shot_id, frame, src_8bit, exr_rgb, synth_mask, aces="AP0"):
         "evidence_id": f"range:{shot_id}:f{frame}",
         "shot_id": shot_id,
         "frame": frame,
-        "src_clipped_pct": round(100 * float((src_8bit * 255 >= CLIP_LEVEL_8BIT).any(-1).mean()), 3),
+        "src_clipped_pct": round(100 * float((np.rint(src_8bit * 255) >= CLIP_LEVEL_8BIT).any(-1).mean()), 3),
         "src_peak_lum": round(float(y_src.max()), 5),
         "hdr_peak_lum": round(float(y_hdr.max()), 5),
         "hdr_mean_lum": round(float(y_hdr.mean()), 5),
@@ -106,7 +108,7 @@ def item_rows(shot_id, frame, src_8bit, items, synth_mask, exr_rgb=None, aces="A
     y_src = lin @ REC709_Y
     mx, mn = src_8bit.max(-1), src_8bit.min(-1)
     sat = np.where(mx > 0, (mx - mn) / np.maximum(mx, EPS), 0.0)
-    clipped = (src_8bit * 255 >= CLIP_LEVEL_8BIT).any(-1)
+    clipped = (np.rint(src_8bit * 255) >= CLIP_LEVEL_8BIT).any(-1)
     y_hdr = exr_rgb @ _aces_y(aces) if exr_rgb is not None else None
 
     rows = []

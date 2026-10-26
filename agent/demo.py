@@ -21,7 +21,7 @@ from measure import metrics
 # clip id -> list of (item, 8-bit RGB, clipped?) bands, plus exposure gains
 CLIPS = {
     "clip01_car_street_sun": {"bands": [("sky", (255, 255, 255)), ("buildings", (120, 110, 100)),
-                                        ("car", (150, 30, 30)), ("road", (255, 254, 250))]},
+                                        ("car", (150, 30, 30)), ("road", (200, 198, 190))]},
     "clip02_lantern_table": {"bands": [("lantern_flame", (255, 250, 200)), ("girl", (200, 150, 120)),
                                        ("hands", (190, 140, 110)), ("table", (90, 60, 40))]},
     "clip03a_canoe_dawn": {"bands": [("sky", (170, 190, 230)), ("person_young", (180, 140, 120)),
@@ -53,7 +53,7 @@ def make(root="samples_demo"):
             m[i * band:(i + 1) * band] = 255
             src[m > 0] = rgb
             Image.fromarray(m).save(d / "masks" / f"{item}.png")
-            if max(rgb) >= 254:
+            if max(rgb) >= 250:
                 synth[m > 0] = 255
         Image.fromarray(src).save(d / "source.png")
         Image.fromarray(synth).save(d / "synth.png")
