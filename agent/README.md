@@ -24,6 +24,21 @@ python -m evals logs/run.jsonl                        # score: 100/100 on the st
 python run.py --serve --port 8000                     # FastAPI; then: curl -X POST localhost:8000/run -d '{"case":"case01_car_sky"}'
 ```
 
+## Reading evidence through Zetaris
+
+```
+EVIDENCE_READ_VIA=zetaris   # default: postgres
+EVIDENCE_DATABASE_URL=postgresql://latent:latent@localhost:5432/evidence   # writes still go here
+ZETARIS_REST_URL=http://localhost:8888
+ZETARIS_API_KEY=...
+ZETARIS_ORG_ID=1
+ZETARIS_DATASOURCE=evidence_pg   # the name the Postgres is registered under in Zetaris
+```
+Writes stay direct to Postgres. Every read goes to Zetaris's SQL editor API as one Spark SQL
+statement, with tables read as `evidence_pg.item_metrics` and so on. Each trace line's `sql`
+entry then records `via: zetaris`, the exact SQL sent, and the Zetaris `query_id`.
+Sample mode always reads locally, so judges need no Zetaris.
+
 ## Where clip files go (agreed with Kyo)
 
 ```

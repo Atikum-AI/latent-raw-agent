@@ -46,7 +46,7 @@ class Run:
                  evidence=None):
         self.case_id, self.clips, self.rulings = case_id, list(clips), list(rulings)
         self.sample_mode, self.log_path = sample_mode, Path(log_path)
-        self.ev = evidence or Evidence()
+        self.ev = evidence or Evidence(sample_mode=sample_mode)
         self.run_id = uuid.uuid4().hex[:8]
         self.lines = []
 
@@ -226,7 +226,9 @@ class Run:
         return round(float(worst["lum_gap_stops"]), 3), [r["evidence_id"] for r in got], [q]
 
     def _item_rows(self, shots):
-        rows, _ = self.ev.sql(f"SELECT * FROM item_metrics WHERE shot_id IN ({_in(len(shots))})", shots)
+        rows, _ = self.ev.sql(
+            f"SELECT evidence_id, shot_id, frame, item, hdr_mean_lum, hdr_r_over_g, hdr_b_over_g "
+            f"FROM item_metrics WHERE shot_id IN ({_in(len(shots))})", shots)
         return rows
 
     def report(self):
