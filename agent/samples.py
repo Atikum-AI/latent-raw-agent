@@ -1,16 +1,18 @@
 """Where the agent finds each clip's files, and how it measures them.
 
-ASSUMED LAYOUT (change PASS_FILES / the names below once Kyo confirms his):
+Layout (agreed with Kyo, who delivers one key frame per clip):
 
     samples/<clip_id>/
-        clip.json        optional: {"key_frame": 1, "aces": "AP0", "source_model": "Veo"}
-        source.png       the key frame, 8-bit, as the video model made it
-        masks/<item>.png SAM 3.1 soft mattes, one per item, named by label
-        synth.png        optional: pixels the expand pass synthesized
-        expand_hdr.exr   the key frame after expand_hdr + to_aces_linear (Kyo's LoRA pass)
-        balance.exr      optional: the key frame after the balance pass
-        evidence.json    written by the agent: the measured rows, so sample mode
-                         needs none of the files above (the EXRs live in the GitHub Release)
+        clip.json        {"key_frame": 48, "aces": "AP1", "source_model": "Seedance", "source_file": "<clip_id>.mp4"}
+        source.png       the key frame, 8-bit
+        masks/<item>.png SAM 3.1 + MatAnyone soft mattes, frame-sized, named by label
+        synth.png        pixels the expand pass synthesized
+        expand_hdr.exr   key frame after expand_hdr + to_aces_linear (ACEScg/AP1, linear, half float)
+        balance.exr      key frame after the balance pass
+        evidence.json    the measured rows, so sample mode needs no EXRs
+
+The small files are committed; the EXRs come from the sample-data-v1 GitHub Release
+(python scripts/fetch_samples.py).
 """
 import json
 import os
@@ -75,12 +77,24 @@ def measure_clip(clip_id):
     return {"shots": shots, "item_metrics": rows, "frame_range": ranges}
 
 
+FETCH_HINT = "python scripts/fetch_samples.py"
+
+
+class MissingSamples(FileNotFoundError):
+    """A clip has neither saved measurements nor the files to measure."""
+
+
 def load_evidence(clip_id, sample_mode):
-    """Sample mode reads evidence.json; otherwise measure the files and save evidence.json."""
-    saved = clip_dir(clip_id) / "evidence.json"
-    if sample_mode or not (clip_dir(clip_id) / "source.png").exists():
+    """Sample mode reads evidence.json. Live mode measures the files and saves evidence.json,
+    unless the EXR is not there (a clean clone): then it reads evidence.json too."""
+    d = clip_dir(clip_id)
+    saved = d / "evidence.json"
+    can_measure = (d / "source.png").exists() and (d / "expand_hdr.exr").exists()
+    if sample_mode or not can_measure:
         if not saved.exists():
-            raise FileNotFoundError(f"no measurements for {clip_id}: expected {saved}")
+            raise MissingSamples(
+                f"No measurements for {clip_id} (looked for {saved}).\n"
+                f"Fetch the sample clips first:  {FETCH_HINT}")
         return json.loads(saved.read_text())
     tables = measure_clip(clip_id)
     saved.write_text(json.dumps(tables, indent=2, default=str))

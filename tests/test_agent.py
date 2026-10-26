@@ -2,9 +2,6 @@
 Run from the repo root: pytest tests/test_agent.py"""
 import json
 import shutil
-import threading
-import urllib.request
-from http.server import HTTPServer
 
 import pytest
 
@@ -114,14 +111,37 @@ def test_two_clip_gap_before_and_after(env, monkeypatch):
 
 
 def test_post_run(env, monkeypatch):
+    from fastapi.testclient import TestClient
     no_model(monkeypatch)
-    run.Handler.log_path = str(env / "srv.jsonl")
-    srv = HTTPServer(("127.0.0.1", 0), run.Handler)
-    threading.Thread(target=srv.serve_forever, daemon=True).start()
-    url = f"http://127.0.0.1:{srv.server_port}/run"
-    req = urllib.request.Request(url, data=json.dumps({"case": "case01_car_sky"}).encode(),
-                                 headers={"Content-Type": "application/json"})
-    body = json.loads(urllib.request.urlopen(req).read())
-    srv.shutdown()
+    client = TestClient(run.make_app(str(env / "srv.jsonl")))
+    body = client.post("/run", json={"case": "case01_car_sky"}).json()
     assert body["report"]["passed"] is True
     assert [l["step"] for l in body["trace"]] == ["classify", "plan", "run", "verify", "report"]
+    assert client.post("/run", json={}).status_code == 400
+
+
+def test_missing_samples_says_how_to_fetch(env, monkeypatch, capsys):
+    no_model(monkeypatch)
+    monkeypatch.setattr(samples, "SAMPLES_DIR", env / "empty")
+    with pytest.raises(SystemExit) as e:
+        run.main(["--case", "case01_car_sky", "--log", str(env / "r.jsonl")])
+    assert "python scripts/fetch_samples.py" in str(e.value)
+
+
+def test_clean_clone_reads_saved_rows_not_half_files(env, monkeypatch):
+    """Committed source.png + masks + evidence.json, EXRs not fetched: keep the saved rows."""
+    no_model(monkeypatch)
+    case = json.load(open("evals/cases/case01_car_sky.json"))
+    core.run_case(case, sample_mode=False, log_path=env / "a.jsonl")  # measures, saves evidence.json
+    d = samples.SAMPLES_DIR / case["clips"][0]
+    saved = (d / "evidence.json").read_text()
+    (d / "expand_hdr.exr").unlink(); (d / "balance.exr").unlink()
+    out = core.run_case(case, sample_mode=False, log_path=env / "b.jsonl")
+    assert (d / "evidence.json").read_text() == saved
+    assert out["report"]["passed"] is True
+
+
+def test_aces_comes_from_clip_json(env):
+    assert samples.clip_info("clip01_car_street_sun")["aces"] == "AP1"
+    rows = samples.measure_clip("clip01_car_street_sun")["item_metrics"]
+    assert rows[0]["hdr_peak_lum"] is not None

@@ -74,4 +74,4 @@ def test_cli_on_sample_trace(tmp_path, capsys):
 def test_null_expectation_skips_the_check():
     c = CASES["case03_dawn_jungle_match"]
     r = score_case(c, right_run(c))
-    assert r["checks"]["items"]["score"] is None and r["score"] == 100.0
+    assert r["checks"]["clipped"]["score"] is None and r["score"] == 100.0

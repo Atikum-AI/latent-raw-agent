@@ -3,7 +3,7 @@
     python run.py --case case01_car_sky           # one eval case
     python run.py --all                           # every case in evals/cases
     python run.py --clips clip03a_canoe_dawn clip03b_jungle_warm --case-id my_match
-    python run.py --serve --port 8000             # POST /run
+    python run.py --serve --port 8000             # POST /run (FastAPI + uvicorn)
 
 SAMPLE_MODE=1 (or --sample) replays saved measurements and Nemotron answers, so it
 needs no GPU, no Nightshift and no database. Every decision goes to logs/run.jsonl;
@@ -12,10 +12,11 @@ score it with:  python -m evals logs/run.jsonl
 import argparse
 import json
 import os
-from http.server import BaseHTTPRequestHandler, HTTPServer
+import sys
 from pathlib import Path
 
 from agent.core import run_case
+from agent.samples import MissingSamples
 
 CASES = Path("evals/cases")
 
@@ -33,29 +34,23 @@ def resolve(body):
     return {"case_id": body.get("case_id", "adhoc"), "clips": body["clips"], "memory": body.get("memory", [])}
 
 
-class Handler(BaseHTTPRequestHandler):
-    log_path = "logs/run.jsonl"
+def make_app(log_path="logs/run.jsonl"):
+    from fastapi import Body, FastAPI, HTTPException
 
-    def do_POST(self):
-        if self.path.rstrip("/") != "/run":
-            return self._send(404, {"error": "POST /run"})
+    app = FastAPI(title="Latent Raw agent")
+
+    @app.get("/")
+    def health():
+        return {"ok": True, "post": "/run", "sample_mode": os.environ.get("SAMPLE_MODE", "0")}
+
+    @app.post("/run")
+    def run(body: dict = Body(...)):
         try:
-            body = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))) or b"{}")
-            out = run_case(resolve(body), log_path=self.log_path)
+            return run_case(resolve(body), log_path=log_path)
         except (ValueError, FileNotFoundError, KeyError) as e:
-            return self._send(400, {"error": str(e)})
-        self._send(200, out)
+            raise HTTPException(400, str(e))
 
-    def do_GET(self):
-        self._send(200, {"ok": True, "post": "/run", "sample_mode": os.environ.get("SAMPLE_MODE", "0")})
-
-    def _send(self, code, obj):
-        data = json.dumps(obj, default=str).encode()
-        self.send_response(code)
-        self.send_header("Content-Type", "application/json")
-        self.send_header("Content-Length", str(len(data)))
-        self.end_headers()
-        self.wfile.write(data)
+    return app
 
 
 def main(argv=None):
@@ -77,9 +72,9 @@ def main(argv=None):
     if a.fresh and Path(a.log).exists():
         Path(a.log).unlink()
     if a.serve:
-        Handler.log_path = a.log
+        import uvicorn
         print(f"POST http://0.0.0.0:{a.port}/run  (log: {a.log})")
-        HTTPServer(("0.0.0.0", a.port), Handler).serve_forever()
+        uvicorn.run(make_app(a.log), host="0.0.0.0", port=a.port)
         return
 
     if a.all:
@@ -90,7 +85,10 @@ def main(argv=None):
         cases = [{"case_id": a.case_id, "clips": a.clips, "memory": []}]
     results = []
     for c in cases:
-        out = run_case(c, log_path=a.log)
+        try:
+            out = run_case(c, log_path=a.log)
+        except MissingSamples as e:
+            sys.exit(f"{c['case_id']}: {e}")
         rep = out["report"]
         print(f"{c['case_id']}: {'PASSED' if rep['passed'] else 'NOT PASSED' if rep['passed'] is False else 'NOTHING TO CHECK'}")
         print(f"    {rep['summary']}")

@@ -21,15 +21,17 @@ the step falls back to rules and the trace says so.
 python -m agent.demo                                  # generated stand-in clips -> samples_demo/
 SAMPLES_DIR=samples_demo python run.py --all --fresh  # all three eval cases
 python -m evals logs/run.jsonl                        # score: 100/100 on the stand-ins
-python run.py --serve --port 8000                     # then: curl -X POST localhost:8000/run -d '{"case":"case01_car_sky"}'
+python run.py --serve --port 8000                     # FastAPI; then: curl -X POST localhost:8000/run -d '{"case":"case01_car_sky"}'
 ```
 
-## Where clip files go (assumed — Kyo to confirm)
+## Where clip files go (agreed with Kyo)
 
 ```
-samples/<clip_id>/source.png, masks/<item>.png, synth.png, expand_hdr.exr, balance.exr, clip.json
+samples/<clip_id>/clip.json, source.png, masks/<item>.png, synth.png, expand_hdr.exr, balance.exr
 ```
-Change `PASS_FILES` in `agent/samples.py` if the real names differ.
+`clip.json` sets the key frame and the ACES space (`"aces": "AP1"` for ACEScg). The EXRs come from
+the `sample-data-v1` release: `python scripts/fetch_samples.py`. If a clip has no
+`evidence.json` and no EXR, `run.py` prints that command.
 
 ## Sample mode for judges
 
