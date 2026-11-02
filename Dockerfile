@@ -1,7 +1,8 @@
 # Latent Raw agent, sample mode: no GPU, no Nightshift, no database needed.
 #   docker build -t latent-raw .
 #   docker run --rm latent-raw                                  # runs all 3 eval cases
-#   docker run --rm -p 8000:8000 latent-raw python run.py --serve  # POST /run
+#   docker run --rm -p 8000:8000 -e RUN_TOKEN=<pick one> latent-raw python run.py --serve --host 0.0.0.0
+#     POST /run with  Authorization: Bearer <RUN_TOKEN>
 FROM python:3.12-slim
 
 WORKDIR /app

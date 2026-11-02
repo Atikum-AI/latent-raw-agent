@@ -3,6 +3,7 @@ Run from the repo root: pytest tests/test_agent.py"""
 import json
 import os
 import shutil
+import sys
 
 import pytest
 
@@ -166,3 +167,58 @@ def test_postgres_forgets_an_earlier_key_frame(env, monkeypatch):
                  evidence=Evidence(DB_URL))
     r.load()
     assert r.classify()["decision"]["clipped_items"] == ["sky"]
+
+
+def test_post_run_needs_the_token_when_one_is_set(env, monkeypatch):
+    from fastapi.testclient import TestClient
+    no_model(monkeypatch)
+    monkeypatch.setenv("RUN_TOKEN", "s3cret")
+    client = TestClient(run.make_app(str(env / "srv.jsonl")))
+    assert client.post("/run", json={"case": "case01_car_sky"}).status_code == 401
+    bad = {"Authorization": "Bearer nope"}
+    assert client.post("/run", json={"case": "case01_car_sky"}, headers=bad).status_code == 401
+    ok = {"Authorization": "Bearer s3cret"}
+    assert client.post("/run", json={"case": "case01_car_sky"}, headers=ok).status_code == 200
+
+
+@pytest.mark.parametrize("body", [{"case": "../../etc/x"}, {"case": "a/b"},
+                                  {"clips": ["../outside"]}, {"clips": ["ok", "x/../../y"]},
+                                  {"clips": ["clip01_car_street_sun"], "case_id": "../x"},
+                                  {"clips": "clip01_car_street_sun"},
+                                  {"clips": ["clip01_car_street_sun"] * (run.MAX_CLIPS + 1)}])
+def test_post_run_refuses_path_like_names(env, monkeypatch, body):
+    from fastapi.testclient import TestClient
+    no_model(monkeypatch)
+    client = TestClient(run.make_app(str(env / "srv.jsonl")))
+    assert client.post("/run", json=body).status_code == 400
+
+
+def test_post_run_bounds_the_memory_it_stores(env, monkeypatch):
+    from fastapi.testclient import TestClient
+    no_model(monkeypatch)
+    client = TestClient(run.make_app(str(env / "srv.jsonl")))
+    body = {"clips": ["clip01_car_street_sun"]}
+    many = [{"ruling_id": f"r{i}", "text": "keep the sky"} for i in range(run.MAX_RULINGS + 1)]
+    assert client.post("/run", json={**body, "memory": many}).status_code == 400
+    long = [{"ruling_id": "r1", "text": "x" * (run.MAX_RULING_CHARS + 1)}]
+    assert client.post("/run", json={**body, "memory": long}).status_code == 400
+    assert client.post("/run", json={**body, "memory": [{"ruling_id": "../r", "text": "a"}]}).status_code == 400
+
+
+def test_clip_dir_refuses_path_like_ids():
+    with pytest.raises(ValueError):
+        samples.clip_dir("../outside")
+
+
+def test_serve_binds_loopback_by_default_and_refuses_open_without_token(monkeypatch):
+    seen = {}
+    monkeypatch.setitem(sys.modules, "uvicorn", type(sys)("uvicorn"))
+    sys.modules["uvicorn"].run = lambda app, host, port: seen.update(host=host)
+    monkeypatch.delenv("RUN_TOKEN", raising=False)
+    run.main(["--serve"])
+    assert seen["host"] == "127.0.0.1"
+    with pytest.raises(SystemExit):
+        run.main(["--serve", "--host", "0.0.0.0"])
+    monkeypatch.setenv("RUN_TOKEN", "s3cret")
+    run.main(["--serve", "--host", "0.0.0.0"])
+    assert seen["host"] == "0.0.0.0"

@@ -15,6 +15,7 @@ The clips live in the Hugging Face dataset caiotbr/latent-raw-agent-samples
 (python scripts/fetch_samples.py).
 """
 import json
+import re
 import os
 from pathlib import Path
 
@@ -37,8 +38,17 @@ PASS_FILES = {
 AFTER = "@balance"  # shot_id suffix for rows measured on the balanced EXR
 
 
+NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]{0,79}")   # clip, case and ruling ids: plain names, never paths
+
+
+def check_name(name, what="clip id"):
+    if not isinstance(name, str) or not NAME.fullmatch(name):
+        raise ValueError(f"{what} must be letters, digits, _ or - (got {name!r})")
+    return name
+
+
 def clip_dir(clip_id):
-    return SAMPLES_DIR / clip_id
+    return SAMPLES_DIR / check_name(clip_id)
 
 
 def clip_info(clip_id):
