@@ -29,7 +29,7 @@ To serve it: `python run.py --serve --port 8000`, then
 `curl -X POST localhost:8000/run -H 'Content-Type: application/json' -d '{"case": "case01_car_sky"}'`.
 It listens on 127.0.0.1 only. To serve the network, set a token: `RUN_TOKEN=<pick one> python run.py --serve --host 0.0.0.0`,
 and send `-H 'Authorization: Bearer <RUN_TOKEN>'` with each request. Case, clip and ruling ids are plain names (letters,
-digits, `_`, `-`); one request adds at most 20 rulings of up to 500 characters each.
+digits, `_`, `-`); one request names at most 8 clips and adds at most 20 rulings of up to 500 characters each.
 
 The full-size clips are in the Hugging Face dataset caiotbr/latent-raw-agent-samples. Sample mode does not need them;
 to measure from them yourself, run `python scripts/fetch_samples.py`, then `python run.py --all`

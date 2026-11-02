@@ -183,7 +183,9 @@ def test_post_run_needs_the_token_when_one_is_set(env, monkeypatch):
 
 @pytest.mark.parametrize("body", [{"case": "../../etc/x"}, {"case": "a/b"},
                                   {"clips": ["../outside"]}, {"clips": ["ok", "x/../../y"]},
-                                  {"clips": ["clip01_car_street_sun"], "case_id": "../x"}])
+                                  {"clips": ["clip01_car_street_sun"], "case_id": "../x"},
+                                  {"clips": "clip01_car_street_sun"},
+                                  {"clips": ["clip01_car_street_sun"] * (run.MAX_CLIPS + 1)}])
 def test_post_run_refuses_path_like_names(env, monkeypatch, body):
     from fastapi.testclient import TestClient
     no_model(monkeypatch)

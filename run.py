@@ -23,6 +23,7 @@ from agent.samples import MissingSamples, check_name
 CASES = Path("evals/cases")
 MAX_RULINGS = 20          # rulings one POST /run may add to memory
 MAX_RULING_CHARS = 500
+MAX_CLIPS = 8             # clips one POST /run may name
 LOOPBACK = {"127.0.0.1", "::1", "localhost"}
 
 
@@ -36,6 +37,8 @@ def resolve(body):
         return load_case(body["case"])
     if not body.get("clips"):
         raise ValueError('send {"case": "<case_id>"} or {"clips": [...]}')
+    if not isinstance(body["clips"], list) or len(body["clips"]) > MAX_CLIPS:
+        raise ValueError(f"clips takes a list of at most {MAX_CLIPS} clip ids")
     clips = [check_name(c) for c in body["clips"]]
     memory = body.get("memory", [])
     if not isinstance(memory, list) or len(memory) > MAX_RULINGS:
